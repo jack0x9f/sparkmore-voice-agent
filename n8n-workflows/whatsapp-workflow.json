@@ -1,0 +1,165 @@
+{
+  "name": "AI Agent - WhatsApp Sender",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-whatsapp-trigger",
+      "name": "Webhook - WhatsApp Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "ai-agent-whatsapp"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "from": "={{ $node['Get Twilio Number'].json.phoneNumber || 'whatsapp:+YOUR_TWILIO_NUMBER' }}",
+        "to": "={{ 'whatsapp:' + $json.to }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "send-whatsapp-twilio",
+      "name": "Send WhatsApp via Twilio",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "credentials": {
+        "twilioApi": {
+          "id": "2",
+          "name": "Twilio account"
+        }
+      },
+      "notes": "Configure Twilio credentials in n8n settings"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "sent"
+            }
+          ]
+        }
+      },
+      "id": "check-delivery",
+      "name": "Check Delivery Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"message\": \"WhatsApp message sent successfully\",\n  \"to\": $json.to,\n  \"messageId\": $json.sid,\n  \"status\": $json.status,\n  \"timestamp\": new Date().toISOString()\n} }}"
+      },
+      "id": "response-whatsapp-success",
+      "name": "Response - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 500,
+        "responseBody": "={{ {\n  \"success\": false,\n  \"message\": \"Failed to send WhatsApp message\",\n  \"error\": $json.error_message || $json.message || 'Unknown error',\n  \"to\": $json.to,\n  \"timestamp\": new Date().toISOString()\n} }}"
+      },
+      "id": "response-whatsapp-error",
+      "name": "Response - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $credentials.twilioApi.accountSid }}/IncomingPhoneNumbers.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twilioApi",
+        "options": {}
+      },
+      "id": "get-twilio-number",
+      "name": "Get Twilio Number",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [350, 150],
+      "credentials": {
+        "twilioApi": {
+          "id": "2",
+          "name": "Twilio account"
+        }
+      },
+      "notes": "Optional: Fetch Twilio WhatsApp number dynamically"
+    }
+  ],
+  "connections": {
+    "Webhook - WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp via Twilio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp via Twilio": {
+      "main": [
+        [
+          {
+            "node": "Check Delivery Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Delivery Status": {
+      "main": [
+        [
+          {
+            "node": "Response - Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "AI Agent",
+      "id": "ai-agent"
+    },
+    {
+      "name": "WhatsApp",
+      "id": "whatsapp"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "sparkmore-ai-agent"
+  },
+  "pinData": {},
+  "versionId": "1.0.0"
+}
+
